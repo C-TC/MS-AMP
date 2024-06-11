@@ -771,6 +771,7 @@ class FP8DistributedOptimizer(MixedPrecisionOptimizer):
 
         # MS-AMP: For FP8, there is a scaling factor for each parameter. So we need to all reduce scaling factors,
         # re-quantize and then reduce-scatter.
+        # CTC: here's the allreduce algorithm in the paper.
         if hasattr(model, '_fp8_main_grad_scales'):
             with ScalingMeta.in_time_scaling_context(enabled=False):
                 for model_id, model in enumerate(self.models):

@@ -40,6 +40,7 @@ class FP8Linear(ScalingModule):
         else:
             self.register_parameter('bias', None)
 
+        # CTC: store the scaling meta data here, different from TE?
         self.scaling_metas = dict(
             input=ScalingMeta(Dtypes.kfloat8_e4m3, window_size=FP8Linear.DEFAULT_WINDOW_SIZE),
             wgrad=ScalingMeta(Dtypes.kfloat8_e4m3, window_size=FP8Linear.DEFAULT_WGRAD_WINDOW_SIZE),
@@ -105,6 +106,7 @@ class LinearReplacer:
         fp8_linear.weight.copy_(weight)
 
         # set custom attributes
+        # CTC: fine, many hacks.
         pairs_list = [(fp8_linear, linear), (fp8_linear.weight, linear.weight)]
         if linear.bias is not None:
             pairs_list.append((fp8_linear.bias, linear.bias))
@@ -152,9 +154,11 @@ class LinearReplacer:
         if isinstance(model, torch.nn.Linear):
             if getattr(model, 'use_fp32_linear', False):
                 return model
+            # CTC: replace the linear module with FP8Linear.
             fp8_net = cls._build_fp8linear(model, weight_qtype)
             return fp8_net
         else:
+            # CTC: recursively replace the linear module with FP8Linear.
             for child_name, child in list(model.named_children()):
                 setattr(model, child_name, cls._replace(child, weight_qtype))
         return model
@@ -178,6 +182,7 @@ class LinearReplacer:
         fp8_named_weights = [(k, p) for k, p in model.named_parameters() if isinstance(p, ScalingParameter)]
 
         fp8_weights = [p for _, p in fp8_named_weights]
+        # CTC: broadcast the weights and inverse scales.
         TensorDist.broadcast(fp8_weights, src=src_rank, group=group)
 
         for k, p in fp8_named_weights:
@@ -191,6 +196,7 @@ class LinearReplacer:
                 if isinstance(param, ScalingParameter):
                     fqn = f'{module_name}.{param_name}'
                     fp8_names.append(fqn)
+        # CTC: I guess it delegates grad sync to optimizer?
         torch.nn.parallel.DistributedDataParallel._set_params_and_buffers_to_ignore_for_model(model, fp8_names)
 
         model_state.register_scaling_metas(model, group)

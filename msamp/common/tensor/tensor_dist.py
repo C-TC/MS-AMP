@@ -42,6 +42,7 @@ class TensorDist:
             dist_fn (function): Distribution function.
             bucket_size (int): Bucket size in bytes.
         """
+        # CTC: easy way to broadcast tensors with bucketting.
         world_size = DistUtil.get_world_size()
         if world_size == 1:
             return
@@ -121,6 +122,7 @@ class TensorDist:
         if len(tensors) == 0:
             return
         qtype = tensors[0].qtype
+        # CTC: for FP8, sum and then divide by world_size. No overflow?
         if Dtypes.is_fp8_qtype(qtype):
             cls.all_reduce(tensors, dist.ReduceOp.SUM, bucket_size)
             for t in tensors:
